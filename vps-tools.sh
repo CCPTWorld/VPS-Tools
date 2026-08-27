@@ -18,8 +18,9 @@
 # ==================================================
 
 
-# 遇到错误立即退出
-set -e
+# 遇到错误不立即退出
+# 防止模块检测失败导致菜单退出
+set +e
 
 
 # GitHub仓库地址
@@ -27,7 +28,6 @@ BASE_URL="https://raw.githubusercontent.com/CCPTWorld/VPS-Tools/main"
 
 
 # 临时目录
-# Linux重启后会自动清理
 WORK_DIR="/tmp/ccpt-vps-tools"
 
 
@@ -36,24 +36,23 @@ MODULE_DIR="$WORK_DIR/modules"
 
 
 
-# 创建临时目录
+# 创建目录
+
 mkdir -p "$MODULE_DIR"
 
 
 
-# 下载模块函数
+# 下载模块
+
 download_module(){
 
     MODULE_NAME=$1
 
 
-    echo "正在加载模块: $MODULE_NAME"
-
-
     curl -fsSL \
     "$BASE_URL/modules/$MODULE_NAME" \
-    -o "$MODULE_DIR/$MODULE_NAME"
-
+    -o "$MODULE_DIR/$MODULE_NAME" \
+    >/dev/null 2>&1
 
 
     chmod +x "$MODULE_DIR/$MODULE_NAME"
@@ -62,16 +61,34 @@ download_module(){
 
 
 
-# 执行模块函数
+# 执行模块
+
 run_module(){
 
-    download_module "$1"
+    MODULE_NAME=$1
 
 
-    bash "$MODULE_DIR/$1"
+    echo
+
+    echo "正在执行: $MODULE_NAME"
+
+    echo
 
 
-    echo ""
+    download_module "$MODULE_NAME"
+
+
+    if bash "$MODULE_DIR/$MODULE_NAME"
+    then
+        echo
+        echo "执行完成"
+    else
+        echo
+        echo "执行失败，请检查错误"
+    fi
+
+
+    echo
 
     read -p "按回车返回菜单..."
 
@@ -80,9 +97,9 @@ run_module(){
 
 
 # 检测模块状态
-# 返回:
-# 0 已完成
-# 1 未完成
+
+# 已完成返回 √
+# 未完成返回 ×
 
 check_module(){
 
@@ -108,6 +125,7 @@ check_module(){
 
 
 
+
 # 显示菜单
 
 show_menu(){
@@ -115,7 +133,8 @@ show_menu(){
 clear
 
 
-echo "
+cat <<EOF
+
 ========================================
 
         CCPT VPS Tools
@@ -125,6 +144,7 @@ echo "
 
 基础初始化
 
+
 1.  系统更新              [$(check_module system-update.sh)]
 
 2.  常用工具安装          [$(check_module install-tools.sh)]
@@ -132,41 +152,43 @@ echo "
 3.  时区设置              [$(check_module timezone.sh)]
 
 
-4.  主机名称设置
+4.  主机名称设置          [×]
 
-5.  时间同步
-
-
-6.  TCP调优(BBR+FQ)
-
-7.  Fail2ban
-
-8.  SSH配置
+5.  时间同步              [×]
 
 
-9.  Swap管理
+6.  TCP调优(BBR+FQ)       [×]
 
-10. journald日志限制
+7.  Fail2ban              [×]
+
+8.  SSH配置               [×]
+
+
+9.  Swap管理              [×]
+
+10. journald日志限制      [×]
 
 
 
 Docker管理
 
-11. Docker安装
 
-12. Docker管理
+11. Docker安装            [×]
 
-13. Docker日志轮转
+12. Docker管理            [×]
+
+13. Docker日志轮转        [×]
 
 
 
 其他
 
-14. Nginx日志轮转
 
-15. 自动清理缓存
+14. Nginx日志轮转         [×]
 
-16. 基础安全参数
+15. 自动清理缓存          [×]
+
+16. 基础安全参数           [×]
 
 
 
@@ -174,70 +196,84 @@ Docker管理
 
 
 ========================================
-"
+
+
+EOF
 
 }
 
 
 
+# ===============================
+# 主程序循环
+# ===============================
 
-# 主循环
 
 while true
 do
 
 
-show_menu
+    show_menu
 
 
-read -p "请输入选项: " CHOICE
+    echo
 
-
-
-case $CHOICE in
-
-
-1)
-
-run_module system-update.sh
-
-;;
-
-
-2)
-
-run_module install-tools.sh
-
-;;
-
-
-3)
-
-run_module timezone.sh
-
-;;
+    read -p "请输入选项: " CHOICE
 
 
 
-0)
-
-echo "退出"
-
-exit 0
-
-;;
+    case "$CHOICE" in
 
 
 
-*)
+    1)
 
-echo "无效选项"
+        run_module system-update.sh
 
-sleep 2
+        ;;
 
-;;
 
-esac
+
+    2)
+
+        run_module install-tools.sh
+
+        ;;
+
+
+
+    3)
+
+        run_module timezone.sh
+
+        ;;
+
+
+
+    0)
+
+        echo
+
+        echo "退出 CCPT VPS Tools"
+
+        exit 0
+
+        ;;
+
+
+
+    *)
+
+        echo
+
+        echo "无效选项"
+
+        sleep 2
+
+        ;;
+
+
+    esac
 
 
 done
